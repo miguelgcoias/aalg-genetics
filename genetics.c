@@ -56,6 +56,11 @@ int main() {
     command = getc(stdin);
   }
 
+  if (text) {
+    free(text);
+    text = NULL;
+  }
+
   return 0;
 }
 
@@ -91,7 +96,7 @@ char *read(size_t *str_sz) {
 void naive(char *text, char *pattern, size_t text_sz, size_t pattern_sz) {
   size_t i, j;
 
-  for (i = 0; i < text_sz - pattern_sz; i++) {
+  for (i = 0; i < text_sz - pattern_sz + 1; i++) {
     for (j = 0; j < pattern_sz; j++) {
       if (text[i + j] != pattern[j])
         break;
@@ -103,76 +108,54 @@ void naive(char *text, char *pattern, size_t text_sz, size_t pattern_sz) {
 }
 
 void kmp(char *text, char *pattern, size_t text_sz, size_t pattern_sz) {
-  size_t i, k = 0;
+  size_t i;
+  size_t j;
   size_t table[pattern_sz];
+  size_t nc = 0;
 
   kmpTable(table, pattern, pattern_sz);
 
+  j = 0;
   for (i = 0; i < text_sz; i++) {
-    /* printf("i: %zu\n", i);
-    printf("k: %zu\n", k); */
-    while (k > 0 && pattern[k] != text[i])
-      k = table[k - 1];
-    if (pattern[k] == text[i])
-      k++;
-    if (k == pattern_sz) {
-      /* printf("k: %zu \n", k); */
-      k = table[k - 1];
+    while (j > 0 && pattern[j] != text[i]) {
+      j = table[j - 1];
+      nc++;
+    }
+    if (pattern[j] == text[i]) {
+      j++;
+    }
+    nc++;
+    if (j == pattern_sz) {
       printf("%zu ", i - pattern_sz + 1);
-      /* printf("i: %zu \n", i); */
+      if (i != text_sz - 1) {
+        j = table[j - 1];
+        nc++;
+      }
     }
   }
-  /* printf("Pattern size: %zu\n", pattern_sz); */
-  printf("\n");
+  printf("\n%zu \n", nc);
 }
 
 /* Do this inside kmp() */
 void kmpTable(size_t *table, char *pattern, size_t pattern_sz) {
-  size_t i, k = 0;
+  size_t i;
+  size_t j;
 
   table[0] = 0;
-  /* printf("%zu ", table[0]); */
 
+  j = 0;
   for (i = 1; i < pattern_sz; i++) {
-    while (k > 0 && pattern[k] != pattern[i])
-      k = table[k - 1];
-    if (pattern[k] == pattern[i])
-      k++;
-    table[i] = k;
-    /* printf("%zu ", table[i]); */
+    while (j > 0 && pattern[j] != pattern[i])
+      j = table[j - 1];
+    if (pattern[j] == pattern[i])
+      j++;
+    table[i] = j;
   }
-  /* printf("\n"); */
 }
 
 void bm(char *text, char *pattern, size_t text_sz, size_t pattern_sz) {
   size_t i;
   size_t nc = 0;
-
-  /*** Bad character rule implementation ***/
-
-  /* badc holds the right-most position of each character that appears in the
-  pattern; 'A' is on position 0, 'C' on 1, 'G' on 2 and 'T' on 3
-  If a character does not appear in the pattern, then its value is the maximum
-  size_t possible, i.e. (size_t) -1 */
-  /* size_t bc[4] = {-1, -1, -1, -1}; */
-  
-  /* To do: explore better ways to do this */
-  /* for (i = 0; i < pattern_sz; i++) {
-    switch (pattern[i]) {
-      case ('A'):
-        bc[0] = (i > bc[0] || bc[0] == -1) ? i : bc[0];
-        break;
-      case ('C'):
-        bc[1] = (i > bc[1] || bc[1] == -1) ? i : bc[1];
-        break;
-      case ('G'):
-        bc[2] = (i > bc[2] || bc[2] == -1) ? i : bc[2];
-        break;
-      case ('T'):
-        bc[3] = (i > bc[3] || bc[3] == -1) ? i : bc[3];
-        break;
-    }
-  } */
 
   /* bc holds the right-most position of every character, or (size_t) -1 if it
   does not appear in the pattern */
@@ -186,16 +169,14 @@ void bm(char *text, char *pattern, size_t text_sz, size_t pattern_sz) {
     bc[ch] = (i > bc[ch] || bc[ch] == -1) ? i : bc[ch];
   }
 
-  /* printf("bc values: %zu %zu %zu %zu\n", bc[0], bc[1], bc[2], bc[3]); */
-
-  /*** Strong good suffix rule implementation ***/
-  /** Z algorithm **/
   size_t z[pattern_sz]; /* Z values */
   size_t left = 0; /* Left box endpoint */
   size_t right = 0; /* Right box endpoint */
   size_t j; /* Auxiliary variable for loops */
-  size_t gs[pattern_sz];
   char pattern_r[pattern_sz]; /* Reversed pattern */
+
+  size_t sl[pattern_sz];
+  size_t bl[pattern_sz];
 
   /* Reverse pattern */
   for (j = 0; j < pattern_sz; j++)
@@ -235,76 +216,61 @@ void bm(char *text, char *pattern, size_t text_sz, size_t pattern_sz) {
     z[j] = temp;
   }
   
-  for (j = 0; j < pattern_sz; j++)
-    gs[j] = 0;
-  for (j = 0; j < pattern_sz - 1; j++) {
-    gs[z[j]] = pattern_sz - j - 2;
-  }
-
-  printf("gs before max_gs: ");
   for (j = 0; j < pattern_sz; j++) {
-    printf("%zu ", gs[j]);
-  }
-  printf("\n");
-
-  size_t max_gs = 0;
-  for (j = 1; j < pattern_sz - 1; j++) {
-    max_gs = (z[j] == j + 1) ? pattern_sz - j - 2 : max_gs;
-    gs[j] = (gs[j] == 0) ? max_gs : gs[j];
+    bl[j] = 0;
+    sl[j] = 0;
   }
 
-  /* Missing bad character integration */
+  for (j = 0; j < pattern_sz - 1; j++) {
+    if (z[j] != 0)
+      bl[pattern_sz - z[j]] = j;
+  }
+
+  /* Fix sl, z[j - 1] == j */
+  /* sl[pattern_sz - 1] = z[0]; */
+  size_t sl_max = 0;
+  for (j = 1; j < pattern_sz; j++) {
+    sl_max = (z[j - 1] == j) ? j : sl_max;
+    sl[pattern_sz - j] = sl_max;
+  }
+
   size_t bc_skip;
+  size_t gs_skip;
   for (i = 0; i < text_sz - pattern_sz + 1; i++) {
     j = 0;
-    while (j < pattern_sz && text[i + pattern_sz - j - 1] == pattern[pattern_sz - j - 1]) {
+    while (j < pattern_sz && pattern[pattern_sz - 1 - j] == text[i + pattern_sz - 1 - j]) {
       j++;
       nc++;
     }
     if (j != pattern_sz) {
       nc++;
-      ch = (size_t) text[i + pattern_sz - j - 1];
+      ch = (size_t) text[i + pattern_sz - 1 - j];
+
+      /* Character does not exist in the pattern */
       if (bc[ch] == -1)
-        bc_skip = pattern_sz - j - 1;
-      else {
-        if (pattern_sz - j - 1 > bc[ch])
-          bc_skip = pattern_sz - j - bc[ch] - 2;
-        else
-          bc_skip = 0;
-      }
-      i += (gs[j] > bc_skip) ? gs[j] : bc_skip;
+        bc_skip = pattern_sz - 1 - j;
+      /* Character is at the left of the current position */
+      else if (pattern_sz - 1 - j > bc[ch])
+        bc_skip = pattern_sz - 1 - j - bc[ch] - 1;
+      /* Character is at the right of the current position */
+      else
+        bc_skip = 0;
+      
+      /* This part is likely broken */
+      if (j == 0)
+        gs_skip = 0;
+      else if (bl[pattern_sz - j] > 0)
+        gs_skip = pattern_sz - 2 - bl[pattern_sz - j];
+      else
+        gs_skip = pattern_sz - 1 - sl[pattern_sz - j];
+      
+      i += (gs_skip > bc_skip) ? gs_skip : bc_skip;
     }
     else {
       printf("%zu ", i);
-      i += gs[pattern_sz - 1];
+      i += pattern_sz - 1 - sl[1];
     }
   }
   printf("\n%zu \n", nc);
-
-
-  printf("z: ");
-  for (j = 0; j < pattern_sz; j++) {
-    printf("%zu ", z[j]);
-  }
-  printf("\n");
-
-  /* printf("           ");
-  for (j = 0; j < ((pattern_sz < 10) ? pattern_sz : 10); j++) {
-    printf("%zu  ", j);
-  }
-  for (j = 10; j < pattern_sz; j++) {
-    printf("%zu ", j);
-  }
-  printf("\n"); */
-/*   printf("String: ");
-  for (j = 0; j < pattern_sz; j++) {
-    printf("%c", pattern[j]);
-  } */
-  /* printf("\n"); */
-  /* printf("gs: ");
-  for (j = 0; j < pattern_sz; j++) {
-    printf("%zu ", gs[j]);
-  }
-  printf("\n"); */
 
 }
