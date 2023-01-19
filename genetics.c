@@ -7,9 +7,8 @@ void naive(char *text, char *pattern, size_t text_sz, size_t pattern_sz);
 void kmp(char *text, char *pattern, size_t text_sz, size_t pattern_sz);
 void bm(char *text, char *pattern, size_t text_sz, size_t pattern_sz);
 
-/** Helper functions **/
+/** Helper function **/
 char *read(size_t *str_sz);
-void kmpTable(size_t *table, char *pattern, size_t pattern_sz);
 
 int main() {
   char *text = NULL, *pattern = NULL;
@@ -111,10 +110,19 @@ void kmp(char *text, char *pattern, size_t text_sz, size_t pattern_sz) {
   size_t i;
   size_t j;
   size_t table[pattern_sz];
-  size_t nc = 0;
+  size_t nc;
 
-  kmpTable(table, pattern, pattern_sz);
+  table[0] = 0;
+  j = 0;
+  for (i = 1; i < pattern_sz; i++) {
+    while (j > 0 && pattern[j] != pattern[i])
+      j = table[j - 1];
+    if (pattern[j] == pattern[i])
+      j++;
+    table[i] = j;
+  }
 
+  nc = 0;
   j = 0;
   for (i = 0; i < text_sz; i++) {
     while (j > 0 && pattern[j] != text[i]) {
@@ -134,23 +142,6 @@ void kmp(char *text, char *pattern, size_t text_sz, size_t pattern_sz) {
     }
   }
   printf("\n%zu \n", nc);
-}
-
-/* Do this inside kmp() */
-void kmpTable(size_t *table, char *pattern, size_t pattern_sz) {
-  size_t i;
-  size_t j;
-
-  table[0] = 0;
-
-  j = 0;
-  for (i = 1; i < pattern_sz; i++) {
-    while (j > 0 && pattern[j] != pattern[i])
-      j = table[j - 1];
-    if (pattern[j] == pattern[i])
-      j++;
-    table[i] = j;
-  }
 }
 
 void bm(char *text, char *pattern, size_t text_sz, size_t pattern_sz) {
