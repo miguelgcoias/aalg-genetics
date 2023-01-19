@@ -15,7 +15,11 @@ One line is output whenever a command N is executed, while two are output in the
   - In the case of K <pattern> and B <pattern>, an additional line is output containing the number of character comparisons performed.
 
 ## Execution
-The tool should be executed with the command
+The tool should be compiled via the command
+```
+make
+```
+and executed with the command
 ```
 /path/to/genetics < input > output
 ```
